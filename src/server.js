@@ -1,7 +1,12 @@
 import fs from 'fs';
 import admin from 'firebase-admin';
 import express from 'express';
+import 'dotenv/config';
 import { db, connectToDb} from './db.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const credentials = JSON.parse(
     fs.readFileSync('./credentials.json')
@@ -12,6 +17,7 @@ admin.initializeApp({
 
 const app = express();
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../build')));
 
 app.use(async (req, res, next) => {
     const { authtoken } = req.headers;
@@ -29,14 +35,9 @@ app.use(async (req, res, next) => {
     next();
 });
 
-// app.post('/hello', (req, res) => {
-//     res.send(`Hi there ${req.body.name}!`);
-// });
-
-// app.get('/hello/:name', (req, res) => {
-//     const { name } = req.params;
-//     res.send(`Hello ${name}!!`);
-// });
+app.get(/^(?!\/api).+/, (req, res) => {
+    res.sendFile(path.join(__dirname, '../build/index.html'));
+});
 
 app.get('/api/articles/:name', async (req, res) => {
     const { name } = req.params;
@@ -63,6 +64,7 @@ app.use((req, res, next) => {
 
 app.put('/api/articles/:name/upvote', async (req, res) => {
     const { name } = req.params;
+    const { uid } = req.user;
 
     const article = await db.collection('articles').findOne({ name });
 
@@ -94,18 +96,17 @@ app.post('/api/articles/:name/comments', async (req, res) => {
 
     const article = await db.collection('articles').findOne({ name });
     if (article) {
-        // article.comments.push({ postedBy, text });
-        // res.send(article.comments);
         res.json(article);
     } else {
         res.status(404).send(`Article ${name} doesn't exist`);
     }
 });
 
+const PORT = process.env.PORT || 8000;
+
 connectToDb(() => {
     console.log('Successfully connected to database');
-    const port = 8000;
-    app.listen(port, () => {
-        console.log(`Server is listening on ${port}`);
+    app.listen(PORT, () => {
+        console.log(`Server is listening on port ${PORT}`);
     });
 });
